@@ -66,31 +66,47 @@ class FalconStd(Peer):
                     av_count_dict[piece][1].append(peer.id)
         
         for peer in peers:
+            # pieces that peer has
             av_set = set(peer.available_pieces)
+            # intersection between what user needs and what other peers have
             isect = av_set.intersection(np_set)
-            if self.max_requests >= len(isect):               
+            
+            # can send all the request in this round
+            if self.max_requests >= len(isect):
+                # write request message to right peers
                 for piece_id in isect:
                     start_block = self.pieces[piece_id]
                     r = Request(self.id, peer.id, piece_id, start_block)
                     requests.append(r)
+                    
+            # pick rarest-first                    
             else:
                 isect_list = []
+                # number of peers who have this piece and what piece
                 for isectPiece in isect:
                     isect_list.append((av_count_dict[isectPiece][0],isectPiece))
+
+                # sort according to first index, which is # of peers who own it
                 isect_list.sort()
+                # the fewer peers have the piece, the rarer the piece is
+                # find the  # of people who own the rarest piece 
                 rarestCount = isect_list[0][0]
                 sameRareList = []
+                # find all equally rarest pieces
                 for el in isect_list:
                     if el[0] == rarestCount:
                         sameRareList.append(el[1])
+                # make sure the order is random        
                 random.shuffle(sameRareList)
                 
                 listSecond = []
+                # merge shuffled rarest list and the rest together
                 for p in isect_list[len(el):]:
                     listSecond.append(p[1])
                 isectIDList = sameRareList + listSecond
+                # cut the list and get needed amount of peers'ID
                 isectIDList = isectIDList[:self.max_requests]
-                
+                # write request message to right peers 
                 for piece_id in isectIDList:
                     start_block = self.pieces[piece_id]
                     r = Request(self.id, peer.id, piece_id, start_block)

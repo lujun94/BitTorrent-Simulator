@@ -144,15 +144,27 @@ class FalconStd(Peer):
         # has a list of Download objects for each Download to this peer in
         # the previous round.
 
-        if round !=0:
+        if round >= 2:
             prevDownHistory = history.downloads[round-1]
+            prevDownHistory2 = history.downloads[round-2]
             historyDict = dict()
+            
+            #go through the history of round - 1
             for downLoad in prevDownHistory:
                 fromId = downLoad.from_id
                 if fromId not in historyDict.keys():
                     historyDict[fromId] = downLoad.blocks
                 else:
                     historyDict[fromId] += downLoad.blocks
+                    
+            #go through the history of round - 2
+            for downLoad in prevDownHistory2:
+                fromId = downLoad.from_id
+                if fromId not in historyDict.keys():
+                    historyDict[fromId] = downLoad.blocks
+                else:
+                    historyDict[fromId] += downLoad.blocks
+
 
             
         if len(requests) == 0:
@@ -164,42 +176,107 @@ class FalconStd(Peer):
             # change my internal state for no reason
             self.dummy_state["cake"] = "pie"
 
-            requesterList = []
-            for request in requests:
-                if request.requester_id not in requesterList:
-                    requesterList.append(request.requester_id)
-
-            rankList = []
-            for requester in requesterList:
-                if requester not in historyDict.keys():
-                    rankList.append((0, requester))
-                else:
-                    rankList.append((historyDict[requester], requester))
-
             chosen = []
-            randomSlotLeft = 4
-            if len(rankList) <= 3:
-                for el in rankList:
-                    chosen.append(el[1])
-                randomSlotLeft = 4 - len(rankList)
-            else:
-                rankList.sort()
-                rankList.reverse()
-                rankList = rankList[:3]
-                for el in rankList:
-                    chosen.append(el[1])
-                randomSlotLeft = 1
+            if round < 2:
+                print("round <2")
+                requesterList = []
+                for request in requests:
+                    if request.requester_id not in requesterList:
+                        requesterList.append(request.requester_id)
+                            
+                for i in range(4):
+                    if len(requests) != 0:
+                        randomRequester = random.choice(requesterList)
+                        chosen.append(randomRequester)
+                        requesterList.remove()                   
 
-            for request in requests:
-                if request.requester_id in chosen:
-                    requests.remove(request)
+            elif round%2 == 0:
+                print("round%2 ==0")
+                requesterList = []
+                for request in requests:
+                    if request.requester_id not in requesterList:
+                        requesterList.append(request.requester_id)
+
+                rankList = []
+                for requester in requesterList:
+                    if requester not in historyDict.keys():
+                        rankList.append((0, requester))
+                    else:
+                        rankList.append((historyDict[requester], requester))
+
+                tempChosen = []
+                randomSlotLeft = 3
+                if len(rankList) <= 3:
+                    for el in rankList:
+                        tempChosen.append(el[1])
+                    randomSlotLeft = 3 - len(rankList)
+                else:
+                    rankList.sort()
+                    rankList.reverse()
+                    rankList = rankList[:3]
+                    for el in rankList:
+                        tempChosen.append(el[1])
+                    randomSlotLeft = 0
+
+                for request in requests:
+                    if request.requester_id in tempChosen:
+                        requests.remove(request)
            
-            for i in range(randomSlotLeft):
-                if len(requests) != 0:
-                    randomRequest = random.choice(requests)
-                    chosen.append(randomRequest)
-                    requests.remove(randomRequest)
-                           
+                for i in range(randomSlotLeft):
+                    if len(requests) != 0:
+                        randomRequest = random.choice(requests)
+                        tempChosen.append(randomRequest.requester_id)
+                        requests.remove(randomRequest)
+
+                prevUpHistory = history.uploads[round-1]
+                for i in range(len(prevUpHistory)):
+                    chosen.append(prevUpHistory[i].to_id)
+
+                if len(chosen) == 4:
+                    for i in range(len(tempChosen)):
+                        chosen[i]= tempChosen[i]
+                else:
+                    if chosen != [] and chosen[-1] not in tempChosen:
+                        last = chosen[-1]
+                        chosen = []
+                        for i in range(len(tempChosen)):
+                            chosen.append(tempChosen[i])
+                        chosen.append(last)
+                    else:
+                        chosen = []
+                        for i in range(len(tempChosen)):
+                            chosen.append(tempChosen[i])
+                        for i in range(4-len(tempChosen)):
+                            if len(requests) != 0:
+                                randomRequest = random.choice(requests)
+                                chosen.append(randomRequest.requester_id)
+                                requests.remove(randomRequest)
+                        
+
+            else:
+                print("else!!!!!")
+                prevUpHistory = history.uploads[round-1]
+                for i in range(len(prevUpHistory)):
+                    chosen.append(prevUpHistory[i].to_id)
+                print(round, chosen)
+                            #find request for optimistic unchoking slot
+
+                            
+                if len(chosen)< 4 or round%3 == 0:
+                    print("round333")
+                    slotsLeft = 4 - len(chosen)
+                    requesterLeft = []
+                    for request in requests:
+                        if request.requester_id not in chosen:
+                            requesterLeft.append(request.requester_id)
+                        
+                    for i in range(slotsLeft):
+                        if len(requesterLeft) != 0:
+                            randomRequester = random.choice(requesterLeft)                        
+                            chosen.append(randomRequester)
+                            requesterLeft.remove(randomRequester)
+                    
+                                       
             #request = random.choice(requests)
             #chosen = [request.requester_id]
             # Evenly "split" my upload bandwidth among the one chosen requester

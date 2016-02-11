@@ -53,20 +53,59 @@ class FalconStd(Peer):
         peers.sort(key=lambda p: p.id)
         # request all available pieces from all peers!
         # (up to self.max_requests from each)
+
+        # find the rarest pieces in the swarm
+        av_count_dict = dict()
+        for peer in peers:
+            av_set = set(peer.available_pieces)
+            for piece in av_set:
+                if piece not in av_count_dict.keys():
+                    av_count_dict[piece] = [1, [peer.id]]
+                else:
+                    av_count_dict[piece][0] += 1
+                    av_count_dict[piece][1].append(peer.id)
+        
         for peer in peers:
             av_set = set(peer.available_pieces)
             isect = av_set.intersection(np_set)
-            n = min(self.max_requests, len(isect))
+            if self.max_requests >= len(isect):               
+                for piece_id in isect:
+                    start_block = self.pieces[piece_id]
+                    r = Request(self.id, peer.id, piece_id, start_block)
+                    requests.append(r)
+            else:
+                isect_list = []
+                for isectPiece in isect:
+                    isect_list.append((av_count_dict[isectPiece][0],isectPiece))
+                isect_list.sort()
+                rarestCount = isect_list[0][0]
+                sameRareList = []
+                for el in isect_list:
+                    if el[0] == rarestCount:
+                        sameRareList.append(el[1])
+                random.shuffle(sameRareList)
+                
+                listSecond = []
+                for p in isect_list[len(el):]:
+                    listSecond.append(p[1])
+                isectIDList = sameRareList + listSecond
+                isectIDList = isectIDList[:self.max_requests]
+                
+                for piece_id in isectIDList:
+                    start_block = self.pieces[piece_id]
+                    r = Request(self.id, peer.id, piece_id, start_block)
+                    requests.append(r)
             # More symmetry breaking -- ask for random pieces.
             # This would be the place to try fancier piece-requesting strategies
             # to avoid getting the same thing from multiple peers at a time.
-            for piece_id in random.sample(isect, n):
+
+            #for piece_id in random.sample(isect, n):
                 # aha! The peer has this piece! Request it.
                 # which part of the piece do we need next?
                 # (must get the next-needed blocks in order)
-                start_block = self.pieces[piece_id]
-                r = Request(self.id, peer.id, piece_id, start_block)
-                requests.append(r)
+                #start_block = self.pieces[piece_id]
+                #r = Request(self.id, peer.id, piece_id, start_block)
+                #requests.append(r)
 
         return requests
 

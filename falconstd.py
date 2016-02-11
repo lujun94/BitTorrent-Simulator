@@ -128,17 +128,64 @@ class FalconStd(Peer):
         # has a list of Download objects for each Download to this peer in
         # the previous round.
 
+        if round !=0:
+            prevDownHistory = history.downloads[round-1]
+            historyDict = dict()
+            for downLoad in prevDownHistory:
+                fromId = downLoad.from_id
+                if fromId not in historyDict.keys():
+                    historyDict[fromId] = downLoad.blocks
+                else:
+                    historyDict[fromId] += downLoad.blocks
+
+            
         if len(requests) == 0:
             logging.debug("No one wants my pieces!")
             chosen = []
             bws = []
         else:
-            logging.debug("Still here: uploading to a random peer")
+            #logging.debug("Still here: uploading to a random peer")
             # change my internal state for no reason
             self.dummy_state["cake"] = "pie"
 
-            request = random.choice(requests)
-            chosen = [request.requester_id]
+            requesterList = []
+            for request in requests:
+                if request.requester_id not in requesterList:
+                    requesterList.append(request.requester_id)
+
+            rankList = []
+            for requester in requesterList:
+                if requester not in historyDict.keys():
+                    rankList.append((0, requester))
+                else:
+                    rankList.append((historyDict[requester], requester))
+
+            chosen = []
+            randomSlotLeft = 4
+            if len(rankList) <= 3:
+                for el in rankList:
+                    chosen.append(el[1])
+                randomSlotLeft = 4 - len(rankList)
+            else:
+                rankList.sort()
+                rankList.reverse()
+                rankList = rankList[:3]
+                for el in rankList:
+                    chosen.append(el[1])
+                randomSlotLeft = 1
+
+            for request in requests:
+                if request.requester_id in chosen:
+                    requests.remove(request)
+           
+            for i in range(randomSlotLeft):
+                if len(requests) != 0:
+                    randomRequest = random.choice(requests)
+                    chosen.append(randomRequest)
+                    requests.remove(randomRequest)
+                           
+            #request = random.choice(requests)
+            #chosen = [request.requester_id]
             # Evenly "split" my upload bandwidth among the one chosen requester
             bws = even_split(self.up_bw, len(chosen))
 

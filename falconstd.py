@@ -145,6 +145,7 @@ class FalconStd(Peer):
         # the previous round.
 
         if round >= 2:
+            # collect the history of download round>=2
             prevDownHistory = history.downloads[round-1]
             prevDownHistory2 = history.downloads[round-2]
             historyDict = dict()
@@ -178,7 +179,7 @@ class FalconStd(Peer):
 
             chosen = []
             if round < 2:
-                print("round <2")
+                #randomly choose peers for unchoking slots
                 requesterList = []
                 for request in requests:
                     if request.requester_id not in requesterList:
@@ -191,7 +192,7 @@ class FalconStd(Peer):
                         requesterList.remove()                   
 
             elif round%2 == 0:
-                print("round%2 ==0")
+                # select the top 3 to be in the unchoking slots
                 requesterList = []
                 for request in requests:
                     if request.requester_id not in requesterList:
@@ -222,16 +223,19 @@ class FalconStd(Peer):
                     if request.requester_id in tempChosen:
                         requests.remove(request)
            
+                #If top 3 slots aren't fill, random pick a peers to the slot
                 for i in range(randomSlotLeft):
                     if len(requests) != 0:
                         randomRequest = random.choice(requests)
                         tempChosen.append(randomRequest.requester_id)
                         requests.remove(randomRequest)
 
+                # get the record of optimistic unchoking
                 prevUpHistory = history.uploads[round-1]
                 for i in range(len(prevUpHistory)):
                     chosen.append(prevUpHistory[i].to_id)
 
+                # keep the optimistic choking
                 if len(chosen) == 4:
                     for i in range(len(tempChosen)):
                         chosen[i]= tempChosen[i]
@@ -254,16 +258,13 @@ class FalconStd(Peer):
                         
 
             else:
-                print("else!!!!!")
+                
                 prevUpHistory = history.uploads[round-1]
                 for i in range(len(prevUpHistory)):
                     chosen.append(prevUpHistory[i].to_id)
-                print(round, chosen)
-                            #find request for optimistic unchoking slot
 
-                            
+                #find optimistic unchoking or fill empty slots
                 if len(chosen)< 4 or round%3 == 0:
-                    print("round333")
                     slotsLeft = 4 - len(chosen)
                     requesterLeft = []
                     for request in requests:

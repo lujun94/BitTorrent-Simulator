@@ -112,7 +112,8 @@ class FalconTyrant(Peer):
 
         In each round, this will be called after requests().
         """
-        
+
+            
         round = history.current_round()
         logging.debug("%s again.  It's round %d." % (
             self.id, round))
@@ -121,9 +122,10 @@ class FalconTyrant(Peer):
         # has a list of Download objects for each Download to this peer in
         # the previous round.
 
-        
+        #dj
+        #uj = bandwidth/#peers           
     
-        
+        uploads = []
         if len(requests) == 0:
             logging.debug("No one wants my pieces!")
             chosen = []
@@ -133,13 +135,62 @@ class FalconTyrant(Peer):
             # change my internal state for no reason
             self.dummy_state["cake"] = "pie"
 
-            request = random.choice(requests)
-            chosen = [request.requester_id]
+            raitoList = []
+            if round == 0:
+                dArray = []
+                uArray = []
+                for i in range(len(peers)):
+                    uArray.append(self.up_bw/len(peers))
+
+                udefault = 1
+                for i in range(len(peers)):
+                    dArray.append(udefault)
+
+            
+                for i in range(len(peers)):
+                    ratioList.append((float(dArray[i]/uArray[i]),peers[i].id))
+
+                #ratioList = random.shuffle(ratioList)
+
+                for peer in peers:
+                    uploads.append(Upload(self.id, peer.id,
+                                          self.up_bw/len(peers)))
+                    
+
+            if round != 0:
+                prevDownloadHistory = history.downloads[round-1]
+
+                for peer in peers:
+                if peer.id in prevDownloadHistory.keys():
+                    for selectedPeer in prevDownloadHistory:
+                        if selectedPeer.id = peer.id:
+                            dj = dj + selectedPeer.blocks
+                    if(round >= 3):
+                        if peer.id in history.download[round-2]:
+                            if peer.id in history.download[round-3]:
+                        
+                                uj = (1-0.1)*uj  
+                    else uj = uj
+                    
+                            
+                else:
+                    dj = peer.available_pieces/ (round-1)
+                    uj = (1+0.2) * uj
+                dArray.append(dj)
+                uArray.append(uj)
+                ratioArray.append(dj/uj)
+                
+            capi = self.up_bw
+            rationArray.sort();
+            while(capi> 0){
+        
+            #request = random.choice(requests)
+            #chosen = [request.requester_id]
             # Evenly "split" my upload bandwidth among the one chosen requester
-            bws = even_split(self.up_bw, len(chosen))
+            #bws = even_split(self.up_bw, len(chosen))
 
         # create actual uploads out of the list of peer ids and bandwidths
-        uploads = [Upload(self.id, peer_id, bw)
-                   for (peer_id, bw) in zip(chosen, bws)]
+        #uploads = [Upload(self.id, peer_id, bw)
+                   #for (peer_id, bw) in zip(chosen, bws)]
             
         return uploads

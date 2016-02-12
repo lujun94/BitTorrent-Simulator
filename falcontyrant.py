@@ -219,8 +219,7 @@ class FalconTyrant(Peer):
                                 for down in dowHis:
                                     if peer.id == down.from_id:
                                         prev3rounds[i] = True
-
-                        #????????            
+           
                         if peer.id not in historyUpDict.keys():
                             prevUp = self.up_bw/(len(peers)-1)
                         else:
@@ -232,10 +231,9 @@ class FalconTyrant(Peer):
                             
                         duDict[peer.id] = [prevDown, prevUp]
                     else:
-                        # ????? estimate slot?
                         
                         prevDown = len(peer.available_pieces)/round/4
-                        #????????
+  
                         if peer.id not in historyUpDict.keys():
                             prevUp = self.up_bw/(len(peers)-1)
                         else:

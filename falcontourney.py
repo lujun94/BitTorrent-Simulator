@@ -122,7 +122,7 @@ class FalconTourney(Peer):
                 #requests.append(r)
 
         return requests
-
+    
     def uploads(self, requests, peers, history):
         """
         requests -- a list of the requests for this peer for this round
@@ -133,7 +133,6 @@ class FalconTourney(Peer):
 
         In each round, this will be called after requests().
         """
-
         round = history.current_round()
         logging.debug("%s again.  It's round %d." % (
             self.id, round))
@@ -142,17 +141,150 @@ class FalconTourney(Peer):
         # has a list of Download objects for each Download to this peer in
         # the previous round.
 
+        if round >= 2:
+            # collect the history of download round>=2
+            prevDownHistory = history.downloads[round-1]
+            prevDownHistory2 = history.downloads[round-2]
+            historyDict = dict()
+            
+            #go through the history of round - 1
+            for downLoad in prevDownHistory:
+                fromId = downLoad.from_id
+                if fromId not in historyDict.keys():
+                    historyDict[fromId] = downLoad.blocks
+                else:
+                    historyDict[fromId] += downLoad.blocks
+                    
+            #go through the history of round - 2
+            for downLoad in prevDownHistory2:
+                fromId = downLoad.from_id
+                if fromId not in historyDict.keys():
+                    historyDict[fromId] = downLoad.blocks
+                else:
+                    historyDict[fromId] += downLoad.blocks
+
+
+        rankSlotsNum = 2
+        if int(len(peers)/6) > 2:
+            rankSlotNum = int(len(peers)/6)
+            
+        optiSlotNum = 1
+        if int(len(peers)/12) > 1:
+            optiSlotNum = int(len(peers)/12)
+        totalSlotNum = rankSlotsNum + optiSlotNum
         if len(requests) == 0:
             logging.debug("No one wants my pieces!")
             chosen = []
             bws = []
         else:
-            logging.debug("Still here: uploading to a random peer")
+            #logging.debug("Still here: uploading to a random peer")
             # change my internal state for no reason
             self.dummy_state["cake"] = "pie"
 
-            request = random.choice(requests)
-            chosen = [request.requester_id]
+            chosen = []
+            if round < 2:
+                #randomly choose peers for unchoking slots
+                requesterList = []
+                for request in requests:
+                    if request.requester_id not in requesterList:
+                        requesterList.append(request.requester_id)
+                            
+                for i in range(totalSlotNum):
+                    if len(requests) != 0:
+                        randomRequester = random.choice(requesterList)
+                        chosen.append(randomRequester)
+                        requesterList.remove(randomRequester)                   
+
+            else:
+                # select the top 3 to be in the unchoking slots
+                requesterList = []
+                for request in requests:
+                    if request.requester_id not in requesterList:
+                        requesterList.append(request.requester_id)
+
+                rankList = []
+                for requester in requesterList:
+                    if requester not in historyDict.keys():
+                        rankList.append((0, requester))
+                    else:
+                        rankList.append((historyDict[requester], requester))
+
+                tempChosen = []
+                randomSlotLeft = rankSlotsNum
+                if len(rankList) <= rankSlotsNum:
+                    for el in rankList:
+                        tempChosen.append(el[1])
+                    randomSlotLeft = rankSlotsNum - len(rankList)
+                else:
+                    rankList.sort()
+                    rankList.reverse()
+                    rankList = rankList[:rankSlotsNum]
+                    for el in rankList:
+                        tempChosen.append(el[1])
+                    randomSlotLeft = 0
+
+                for request in requests:
+                    if request.requester_id in tempChosen:
+                        requests.remove(request)
+           
+                #If rank slots aren't fill, random pick a peers to the slot
+                for i in range(randomSlotLeft):
+                    if len(requests) != 0:
+                        randomRequest = random.choice(requests)
+                        tempChosen.append(randomRequest.requester_id)
+                        requests.remove(randomRequest)
+
+                # get history of last round
+                prevUpHistory = history.uploads[round-1]
+                for i in range(len(prevUpHistory)):
+                    chosen.append(prevUpHistory[i].to_id)
+
+                if round%3 != 0:
+                    # if the slots are full last round, copy all the slots
+                    if len(chosen) == totalSlotNum:
+                        for i in range(len(tempChosen)):
+                            chosen[i]= tempChosen[i]
+                    else:
+                        # if last round's optimistic unchoking is not
+                        # chosen this round
+                        prevchosen = chosen
+                        if len(chosen) >= optiSlotNum:
+                            chosen = []
+                            for i in range(len(tempChosen)):
+                                chosen.append(tempChosen[i])
+                            for i in range(optiSlotNum):
+                                if prevchosen[-optiSlotNum+i] not in tempChosen:
+                                    # copy optimistic unchoking from last round
+                                    last = prevchosen[-optiSlotNum+i]
+                                    chosen.append(last)
+                                else:
+                                    if len(requests) != 0:
+                                        randomRequest = random.choice(requests)
+                                        chosen.append(randomRequest.requester_id)
+                                        requests.remove(randomRequest)
+                                    
+                        # if last round's slots are all empty
+                        else:
+                            chosen = []
+                            for i in range(len(tempChosen)):
+                                chosen.append(tempChosen[i])
+                            # add random peer to this extra slot                              
+                            for i in range(totalSlotNum-len(tempChosen)):
+                                if len(requests) != 0:
+                                    randomRequest = random.choice(requests)
+                                    chosen.append(randomRequest.requester_id)
+                                    requests.remove(randomRequest)
+                else:
+                    chosen = []
+                    chosen = tempChosen
+                    if len(requests) != 0:
+                        randomRequest = random.choice(requests)
+                        # select optimistic unchoking
+                        chosen.append(randomRequest.requester_id)                   
+                                       
+                                       
+            #request = random.choice(requests)
+            #chosen = [request.requester_id]
             # Evenly "split" my upload bandwidth among the one chosen requester
             bws = even_split(self.up_bw, len(chosen))
 
@@ -161,3 +293,4 @@ class FalconTourney(Peer):
                    for (peer_id, bw) in zip(chosen, bws)]
             
         return uploads
+

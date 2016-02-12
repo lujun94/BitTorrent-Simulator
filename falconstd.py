@@ -191,7 +191,7 @@ class FalconStd(Peer):
                         chosen.append(randomRequester)
                         requesterList.remove()                   
 
-            elif round%2 == 0:
+            else:
                 # select the top 3 to be in the unchoking slots
                 requesterList = []
                 for request in requests:
@@ -230,53 +230,45 @@ class FalconStd(Peer):
                         tempChosen.append(randomRequest.requester_id)
                         requests.remove(randomRequest)
 
-                # get the record of optimistic unchoking
+                # get history of last round
                 prevUpHistory = history.uploads[round-1]
                 for i in range(len(prevUpHistory)):
                     chosen.append(prevUpHistory[i].to_id)
 
-                # keep the optimistic choking
-                if len(chosen) == 4:
-                    for i in range(len(tempChosen)):
-                        chosen[i]= tempChosen[i]
-                else:
-                    if chosen != [] and chosen[-1] not in tempChosen:
-                        last = chosen[-1]
-                        chosen = []
+                if round%3 != 0:
+                    # if the slots are full last round, copy all the slots
+                    if len(chosen) == 4:
                         for i in range(len(tempChosen)):
-                            chosen.append(tempChosen[i])
-                        chosen.append(last)
+                            chosen[i]= tempChosen[i]
                     else:
-                        chosen = []
-                        for i in range(len(tempChosen)):
-                            chosen.append(tempChosen[i])
-                        for i in range(4-len(tempChosen)):
-                            if len(requests) != 0:
-                                randomRequest = random.choice(requests)
-                                chosen.append(randomRequest.requester_id)
-                                requests.remove(randomRequest)
-                        
-
-            else:
-                
-                prevUpHistory = history.uploads[round-1]
-                for i in range(len(prevUpHistory)):
-                    chosen.append(prevUpHistory[i].to_id)
-
-                #find optimistic unchoking or fill empty slots
-                if len(chosen)< 4 or round%3 == 0:
-                    slotsLeft = 4 - len(chosen)
-                    requesterLeft = []
-                    for request in requests:
-                        if request.requester_id not in chosen:
-                            requesterLeft.append(request.requester_id)
-                        
-                    for i in range(slotsLeft):
-                        if len(requesterLeft) != 0:
-                            randomRequester = random.choice(requesterLeft)                        
-                            chosen.append(randomRequester)
-                            requesterLeft.remove(randomRequester)
-                    
+                        # if last round's optimistic unchoking is not
+                        # chosen this round
+                        if chosen != [] and chosen[-1] not in tempChosen:
+                            # copy optimistic unchoking from last round
+                            last = chosen[-1]
+                            chosen = []
+                            for i in range(len(tempChosen)):
+                                chosen.append(tempChosen[i])
+                            chosen.append(last)
+                        # if last round's slots are all empty
+                        else:
+                            chosen = []
+                            for i in range(len(tempChosen)):
+                                chosen.append(tempChosen[i])
+                            # add random peer to this extra slot                              
+                            for i in range(4-len(tempChosen)):
+                                if len(requests) != 0:
+                                    randomRequest = random.choice(requests)
+                                    chosen.append(randomRequest.requester_id)
+                                    requests.remove(randomRequest)
+                else:
+                    chosen = []
+                    chosen = tempChosen
+                    if len(requests) != 0:
+                        randomRequest = random.choice(requests)
+                        # select optimistic unchoking
+                        chosen.append(randomRequest.requester_id)                   
+                                       
                                        
             #request = random.choice(requests)
             #chosen = [request.requester_id]

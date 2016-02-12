@@ -189,7 +189,7 @@ class FalconStd(Peer):
                     if len(requests) != 0:
                         randomRequester = random.choice(requesterList)
                         chosen.append(randomRequester)
-                        requesterList.remove()                   
+                        requesterList.remove(randomRequester)                   
 
             else:
                 # select the top 3 to be in the unchoking slots

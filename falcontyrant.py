@@ -58,48 +58,70 @@ class FalconTyrant(Peer):
         for peer in peers:
             av_set = set(peer.available_pieces)
             for piece in av_set:
-                if piece not in av_count_dic.keys():
-                    av_count_dic[piece] = [1, [peer.id]]
+                if piece not in av_count_dict.keys():
+                    av_count_dict[piece] = [1, [peer.id]]
                 else:
                     av_count_dict[piece][0] += 1
                     av_count_dict[piece][1].append(peer.id)
-
+        
         for peer in peers:
+            # pieces that peer has
             av_set = set(peer.available_pieces)
-            
+            # intersection between what user needs and what other peers have
             isect = av_set.intersection(np_set)
-
+            
+            # can send all the request in this round
             if self.max_requests >= len(isect):
+                # write request message to right peers
                 for piece_id in isect:
                     start_block = self.pieces[piece_id]
                     r = Request(self.id, peer.id, piece_id, start_block)
-                    request.append(r)
-
+                    requests.append(r)
+                    
+            # pick rarest-first                    
             else:
                 isect_list = []
-
+                # number of peers who have this piece and what piece
                 for isectPiece in isect:
-                    isect_list.append((av_count_dict[isectPiece][0], isectPiece))
+                    isect_list.append((av_count_dict[isectPiece][0],isectPiece))
 
+                # sort according to first index, which is # of peers who own it
                 isect_list.sort()
-
+                # the fewer peers have the piece, the rarer the piece is
+                # find the  # of people who own the rarest piece 
                 rarestCount = isect_list[0][0]
-                sameRareList =[]
+                sameRareList = []
+                # find all equally rarest pieces
                 for el in isect_list:
                     if el[0] == rarestCount:
                         sameRareList.append(el[1])
+                # make sure the order is random        
                 random.shuffle(sameRareList)
-
+                
                 listSecond = []
+                # merge shuffled rarest list and the rest together
                 for p in isect_list[len(el):]:
                     listSecond.append(p[1])
                 isectIDList = sameRareList + listSecond
+                # cut the list and get needed amount of peers'ID
                 isectIDList = isectIDList[:self.max_requests]
+                # write request message to right peers 
                 for piece_id in isectIDList:
                     start_block = self.pieces[piece_id]
-                    r = Request(self.id, peer.id. piece_id, start_block)
+                    r = Request(self.id, peer.id, piece_id, start_block)
                     requests.append(r)
- 
+            # More symmetry breaking -- ask for random pieces.
+            # This would be the place to try fancier piece-requesting strategies
+            # to avoid getting the same thing from multiple peers at a time.
+
+            #for piece_id in random.sample(isect, n):
+                # aha! The peer has this piece! Request it.
+                # which part of the piece do we need next?
+                # (must get the next-needed blocks in order)
+                #start_block = self.pieces[piece_id]
+                #r = Request(self.id, peer.id, piece_id, start_block)
+                #requests.append(r)
+
         return requests
 
     def uploads(self, requests, peers, history):
@@ -139,12 +161,13 @@ class FalconTyrant(Peer):
             if round == 0:
                 dArray = []
                 uArray = []
+                estimatedSlots = 4
                 for i in range(len(peers)):
-                    uArray.append(self.up_bw/len(peers))
+                    uArray.append(self.up_bw/(len(peers)-1))
 
-                udefault = 1
+                #default = 1
                 for i in range(len(peers)):
-                    dArray.append(udefault)
+                    dArray.append(peers[i].up_bw/estimatedSlots)
 
             
                 for i in range(len(peers)):
@@ -158,39 +181,85 @@ class FalconTyrant(Peer):
                     
 
             if round != 0:
-                prevDownloadHistory = history.downloads[round-1]
-
-                for peer in peers:
-                if peer.id in prevDownloadHistory.keys():
-                    for selectedPeer in prevDownloadHistory:
-                        if selectedPeer.id = peer.id:
-                            dj = dj + selectedPeer.blocks
-                    if(round >= 3):
-                        if peer.id in history.download[round-2]:
-                            if peer.id in history.download[round-3]:
-                        
-                                uj = (1-0.1)*uj  
-                    else uj = uj
-                    
-                            
-                else:
-                    dj = peer.available_pieces/ (round-1)
-                    uj = (1+0.2) * uj
-                dArray.append(dj)
-                uArray.append(uj)
-                ratioArray.append(dj/uj)
                 
-            capi = self.up_bw
-            rationArray.sort();
-            while(capi> 0){
-        
-            #request = random.choice(requests)
-            #chosen = [request.requester_id]
-            # Evenly "split" my upload bandwidth among the one chosen requester
-            #bws = even_split(self.up_bw, len(chosen))
 
-        # create actual uploads out of the list of peer ids and bandwidths
-        #uploads = [Upload(self.id, peer_id, bw)
-                   #for (peer_id, bw) in zip(chosen, bws)]
+                # download history 
+                prevDownloadHistory = history.downloads[round-1]
+                historyDownDict = dict()
+
+                for downLoad in prevDownloadHistory:
+                    fromId = downLoad.from_id
+                    if fromId not in historyDownDict.keys():
+                        historyDownDict[fromId] = downLoad.blocks
+                    else:
+                        historyDownDict[fromId] += downLoad.blocks
+
+
+                # upload history
+                prevUploadHistory = history.uploads[round-1]
+                historyUpDict = dict()
+
+                for upLoad in prevUploadHistory:
+                    toId = upLoad.to_id
+                    if toId not in historyUpDict.keys():
+                        historyUpDict[toId] = upLoad.bw
+                    else:
+                        historyUpDict[toId] += upLoad.bw
+
+                duDict = dict()                       
+                for peer in peers:
+                    if (peer.id in historyDownDict.keys()):
+                        prevDown = historyDownDict[peer.id]
+                        # what if I didn't upload to j
+                        #if(peer.id in historyUpDict.keys():
+                        prev3rounds = [False, False, False]
+                        if round >= 3:                           
+                            for i in range(3):
+                                dowHis = history.downloads[round-i-1]
+                                for down in dowHis:
+                                    if peer.id == down.from_id:
+                                        prev3rounds[i] = True
+
+                        #????????            
+                        if peer.id not in historyUpDict.keys():
+                            prevUp = self.up_bw/(len(peers)-1)
+                        else:
+                            prevUp = historyUpDict[peer.id]
+                            
+                        if (prev3rounds[0]==True) and (prev3rounds[1]==True) \
+                           and prev3rounds[2]==True:
+                            prevUp = (1-0.1)*prevUp
+                            
+                        duDict[peer.id] = [prevDown, prevUp]
+                    else:
+                        # ????? estimate slot?
+                        
+                        prevDown = len(peer.available_pieces)/round/4
+                        #????????
+                        if peer.id not in historyUpDict.keys():
+                            prevUp = self.up_bw/(len(peers)-1)
+                        else:
+                            prevUp = historyUpDict[peer.id]*(1+0.2)
+                        duDict[peer.id] = [prevDown, prevUp]
+
+                rankList = []
+                for peer in duDict.keys():
+                    rankList.append((float(duDict[peer][0]/duDict[peer][1]),
+                                     duDict[peer][1], peer))
+
+                rankList.sort()
+                rankList.reverse()
+
+                cap = self.up_bw
+                count = 0
+                while cap > 0:
+                    if (count <= len(rankList)-1):
+                        if (cap - rankList[count][1])> 1:
+                            uploads.append(Upload(self.id, rankList[count][2],
+                                                  rankList[count][1]))
+                        cap = cap - rankList[count][1]
+                        count += 1
+                    else:
+                        break
             
         return uploads
